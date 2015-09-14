@@ -15,6 +15,21 @@ from PIL import Image
 global g_numberPattern
 g_numberPattern = re.compile('(\d+)')
 
+#目录和文件名分割模式
+global g_pathPattern
+g_pathPattern = re.compile("(.*)/.*")
+
+'''
+@brief 如果小图包含目录结构，建目录
+'''
+def buildFolder(path, smallPicName):
+    global g_pathPattern
+    result = g_pathPattern.findall(smallPicName)
+    #如果小图还存在目录结构
+    if len(result)>0 and not os.path.exists(path+'/'+result[0]):
+        os.makedirs(path+'/'+result[0])
+
+
 '''
 @brief 裁剪图片
 @param path            路径
@@ -28,11 +43,20 @@ g_numberPattern = re.compile('(\d+)')
 '''
 def interceptingPicture(path, pngFileName, smallPicName, frame, offset, rotated, sourceColorRect, sourceSize):
     img = Image.open(path+'/'+pngFileName)
-    data = img.crop((frame[0], frame[1], frame[2]+frame[0], frame[3]+frame[1]))
-    newImg = Image.new("RGBA", (sourceSize[0], sourceSize[1]))#, (1, 1, 1, 1))
+    data = None
+    if not rotated:
+        data = img.crop((frame[0], frame[1], frame[0]+frame[2], frame[1]+frame[3]))
+    else:
+        data = img.crop((frame[0], frame[1], frame[0]+frame[3], frame[1]+frame[2]))
+    newImg = None
+    if not rotated:
+        newImg = Image.new("RGBA", (sourceSize[0], sourceSize[1]))#, (1, 1, 1, 1))
+    else:
+        newImg = Image.new("RGBA", (sourceSize[1], sourceSize[0]))
     newImg.paste(data, (offset[0], offset[1]))
     if rotated:
         newImg = newImg.rotate(90)
+    buildFolder(path+'/'+pngFileName[:-4], smallPicName)
     newImg.save(path+'/'+pngFileName[:-4]+'/'+smallPicName)
 
 '''
@@ -73,7 +97,7 @@ def onePic(path, pngFileName, smallPicName, onePicNode):
     global g_numberPattern
     frame           = g_numberPattern.findall(frameStr)
     offset          = g_numberPattern.findall(offsetStr)
-    rotated         = g_numberPattern.findall(rotatedStr)
+    rotated         = "true"==rotatedStr
     sourceColorRect = g_numberPattern.findall(sourceColorRectStr)
     sourceSize      = g_numberPattern.findall(sourceSizeStr)
     interceptingPicture(
@@ -82,7 +106,7 @@ def onePic(path, pngFileName, smallPicName, onePicNode):
                         smallPicName,
                         (int(frame[0]),int(frame[1]),int(frame[2]),int(frame[3])),
                         (int(offset[0]), int(offset[1])),
-                        ("True"==rotated),
+                        rotated,
                         (int(sourceColorRect[0]), int(sourceColorRect[1]), int(sourceColorRect[2]), int(sourceColorRect[3])),
                         (int(sourceSize[0]),int(sourceSize[1])))
 
